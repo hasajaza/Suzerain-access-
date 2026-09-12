@@ -1,0 +1,95 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Optional user override of the game folder (see GamePath.props). -->
+  <Import Project="GamePath.props" Condition="Exists('GamePath.props')" />
+
+  <PropertyGroup>
+    <!-- BepInEx 6 IL2CPP runs plugins on .NET 6 (CoreCLR). Do not raise this. -->
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>SuzerainAccess</AssemblyName>
+    <RootNamespace>SuzerainAccess</RootNamespace>
+    <Version>1.0.36</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PlatformTarget>x64</PlatformTarget>
+    <DebugType>portable</DebugType>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <!-- Interop assemblies trigger many harmless nullable/obsolete warnings. -->
+    <NoWarn>$(NoWarn);CS0618;CS8632;MSB3277;CA1416</NoWarn>
+  </PropertyGroup>
+
+  <!-- Automatic game folder detection when GamePath.props leaves SuzerainDir empty. -->
+  <PropertyGroup Condition="'$(SuzerainDir)' == ''">
+    <_SteamPath>$([MSBuild]::GetRegistryValueFromView('HKEY_CURRENT_USER\Software\Valve\Steam', 'SteamPath', null, RegistryView.Registry64, RegistryView.Registry32))</_SteamPath>
+    <SuzerainDir Condition="'$(_SteamPath)' != '' And Exists('$(_SteamPath)\steamapps\common\Suzerain\GameAssembly.dll')">$(_SteamPath)\steamapps\common\Suzerain</SuzerainDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(SuzerainDir)' == '' And Exists('C:\Program Files (x86)\Steam\steamapps\common\Suzerain\GameAssembly.dll')">
+    <SuzerainDir>C:\Program Files (x86)\Steam\steamapps\common\Suzerain</SuzerainDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(SuzerainDir)' == '' And Exists('C:\Program Files\Steam\steamapps\common\Suzerain\GameAssembly.dll')">
+    <SuzerainDir>C:\Program Files\Steam\steamapps\common\Suzerain</SuzerainDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <BepInExCore>$(SuzerainDir)\BepInEx\core</BepInExCore>
+    <BepInExInterop>$(SuzerainDir)\BepInEx\interop</BepInExInterop>
+  </PropertyGroup>
+
+  <Target Name="SuzerainAccessCheckGamePath" BeforeTargets="ResolveAssemblyReferences;CoreCompile">
+    <Error Condition="'$(SuzerainDir)' == '' Or !Exists('$(BepInExInterop)\Assembly-CSharp.dll')"
+           Text="SuzerainAccess: cannot find the Suzerain game folder with BepInEx interop assemblies. Open SuzerainAccess\GamePath.props, put the folder containing Suzerain.exe between the SuzerainDir tags, save, and build again. The game must have been started once with BepInEx installed so that BepInEx\interop exists. Current value: '$(SuzerainDir)'." />
+  </Target>
+
+  <!--
+    All references come from YOUR game installation (BepInEx\core and BepInEx\interop), so the plugin is
+    compiled against exactly the BepInEx build and the interop assemblies that match your GameAssembly.dll.
+    Private=false: none of these are copied next to the plugin (BepInEx already loads them).
+  -->
+  <ItemGroup>
+    <Reference Include="BepInEx.Core"><HintPath>$(BepInExCore)\BepInEx.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx.Unity.IL2CPP"><HintPath>$(BepInExCore)\BepInEx.Unity.IL2CPP.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Il2CppInterop.Runtime"><HintPath>$(BepInExCore)\Il2CppInterop.Runtime.dll</HintPath><Private>false</Private></Reference>
+
+    <Reference Include="Il2Cppmscorlib"><HintPath>$(BepInExInterop)\Il2Cppmscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(BepInExInterop)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(BepInExInterop)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(BepInExInterop)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(BepInExInterop)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.InputSystem"><HintPath>$(BepInExInterop)\Unity.InputSystem.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>$(BepInExInterop)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <!-- Pixel Crushers Dialogue System (DialogueLua for game variables such as graph danger thresholds). -->
+    <Reference Include="Assembly-CSharp-firstpass"><HintPath>$(BepInExInterop)\Assembly-CSharp-firstpass.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <!-- 64-bit UniversalSpeech.dll built from the official source (see native\BUILD-NOTES.md). -->
+  <ItemGroup>
+    <None Include="..\native\UniversalSpeech.dll" Link="UniversalSpeech.dll" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Optional: 64-bit NVDA controller client and ZDSR API. They are NOT part of the repository (third-party files); if you put them in native\, the build copies them too. -->
+    <None Include="..\native\nvdaControllerClient.dll" Link="nvdaControllerClient.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\native\nvdaControllerClient.dll')" />
+    <None Include="..\native\ZDSRAPI.dll" Link="ZDSRAPI.dll" CopyToOutputDirectory="PreserveNewest" Condition="Exists('..\native\ZDSRAPI.dll')" />
+    <!-- 32-bit JAWS helper, only started if JAWS cannot be reached from the 64-bit game (see native\BUILD-NOTES.md). -->
+    <None Include="..\native\JawsBridge32.exe" Link="JawsBridge32.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!--
+    After every successful build, copy the plugin straight into BepInEx\plugins (the same place you would
+    copy it by hand), and the JAWS helper next to Suzerain.exe. Your own speech files next to Suzerain.exe
+    (UniversalSpeech.dll, nvdaControllerClient.dll, ZDSRAPI.dll) are never overwritten.
+    A left-over copy in BepInEx\plugins\SuzerainAccess\ from older versions is removed, so only one copy exists.
+    Close the game before building: Windows does not allow replacing the plugin while the game uses it.
+  -->
+  <Target Name="SuzerainAccessDeploy" AfterTargets="Build" Condition="'$(DeployToGame)' == 'true' And Exists('$(SuzerainDir)\BepInEx\plugins')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SuzerainDir)\BepInEx\plugins" SkipUnchangedFiles="false" Retries="3" RetryDelayMilliseconds="1000" ContinueOnError="WarnAndContinue" />
+    <Warning Condition="'$(MSBuildLastTaskResult)' == 'false'" Text="SuzerainAccess: could not copy SuzerainAccess.dll into $(SuzerainDir)\BepInEx\plugins. Close the game and build again. If it still fails, Windows is refusing access to the game folder: start Visual Studio with 'Run as administrator', or copy bin\Release\SuzerainAccess.dll by hand." />
+    <Message Condition="'$(MSBuildLastTaskResult)' != 'false'" Importance="high" Text="SuzerainAccess: plugin copied to $(SuzerainDir)\BepInEx\plugins\SuzerainAccess.dll" />
+
+    <Copy SourceFiles="$(TargetDir)JawsBridge32.exe" DestinationFolder="$(SuzerainDir)" SkipUnchangedFiles="true" Retries="3" RetryDelayMilliseconds="1000" ContinueOnError="WarnAndContinue" />
+
+    <Delete Files="$(SuzerainDir)\BepInEx\plugins\SuzerainAccess\SuzerainAccess.dll" ContinueOnError="true" />
+  </Target>
+
+</Project>

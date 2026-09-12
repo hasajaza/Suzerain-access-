@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    OPTIONAL. Only edit this file if the build reports that it cannot find your Suzerain folder.
+    Put the folder that contains Suzerain.exe, GameAssembly.dll and the BepInEx folder between the tags, e.g.
+      <SuzerainDir>D:\SteamLibrary\steamapps\common\Suzerain</SuzerainDir>
+    Leave it empty to use automatic detection.
+  -->
+  <PropertyGroup>
+    <SuzerainDir Condition="'$(SuzerainDir)' == ''"></SuzerainDir>
+    <!-- true = after a successful build, copy SuzerainAccess.dll into BepInEx\plugins and JawsBridge32.exe next to
+         Suzerain.exe. Set to false to copy by hand instead. -->
+    <DeployToGame Condition="'$(DeployToGame)' == ''">true</DeployToGame>
+  </PropertyGroup>
+</Project>
