@@ -164,7 +164,9 @@ namespace SuzerainAccess.Features
             {
                 var s = stats[i];
                 if (!UiUtil.Alive(s) || !s.gameObject.activeInHierarchy) continue;
-                string entry = GameText.StatName(s) + ": " + GameText.StatValue(s);
+                string name = GameText.StatName(s), value = GameText.StatValue(s);
+                if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(value)) continue;
+                string entry = string.IsNullOrWhiteSpace(name) ? value : name + ": " + value;
                 if (withModifiers && ModConfig.DetailedNumbers.Value)
                 {
                     string mods = GameText.StatModifiers(s);
@@ -177,7 +179,10 @@ namespace SuzerainAccess.Features
             {
                 var s = textStats[i];
                 if (!UiUtil.Alive(s) || !s.gameObject.activeInHierarchy) continue;
-                entries.Add(GameText.TextStatName(s) + ": " + GameText.TextStatValue(s));
+                string name = GameText.TextStatName(s), value = GameText.TextStatValue(s);
+                // Skip empty widgets and placeholders ("None") that the game shows before data is set.
+                if (string.IsNullOrWhiteSpace(value) || value.Equals("None", StringComparison.OrdinalIgnoreCase)) continue;
+                entries.Add(string.IsNullOrWhiteSpace(name) ? value : name + ": " + value);
             }
             return entries;
         }

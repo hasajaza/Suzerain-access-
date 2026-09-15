@@ -106,7 +106,7 @@ namespace SuzerainAccess.Game
                 catch { }
                 if (root != null) regions.Add(new Region { Descriptor = d, Name = d.Name, Root = root });
             }
-            if (regions.Count == 0) regions.Add(new Region { Descriptor = null, Name = "Screen", Root = null });
+            if (regions.Count == 0) regions.Add(new Region { Descriptor = null, Name = "Loading", Root = null });
 
             string signature = string.Join("|", regions.ConvertAll(r => r.Id));
             if (signature == _signature)

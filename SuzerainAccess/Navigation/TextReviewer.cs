@@ -254,6 +254,7 @@ namespace SuzerainAccess.Navigation
                 try
                 {
                     if (!UiUtil.IsTextVisible(t)) continue;
+                    if (UiUtil.IsOnInactivePage(t.transform)) continue;
                     string s = UiUtil.TextOf(t);
                     if (string.IsNullOrEmpty(s)) continue;
                     if (ModConfig.IgnoreDecorativeText.Value && (TextUtil.IsDecorative(s) || !seen.Add(s))) continue;

@@ -48,7 +48,7 @@ This also helps other Unity games.
 ## The mod speaks, but a key does nothing
 
 - Press F1 to hear the current bindings. They may have been changed in the config.
-- **Enter does nothing on a control:** use Numpad Enter, or set F9 > "Enter key activation" to "always handled by the mod". Please send the log line starting with `EventSystem present`.
+- **Enter does nothing on a control:** use Ctrl+Enter, or set F9 > "Enter key activation" to "always handled by the mod". Please send the log line starting with `EventSystem present`.
 - **Enter presses something twice:** set "Enter key activation" back to "automatic", and report which control it was.
 - **While typing in a text field**, only Tab and the F-keys are used by the mod. Leave the field with Tab.
 

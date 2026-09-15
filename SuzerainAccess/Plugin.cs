@@ -17,7 +17,7 @@ namespace SuzerainAccess
     {
         public const string Guid = "com.suzerainaccess.mod";
         public const string Name = "Suzerain Access";
-        public const string Version = "1.0.36";
+        public const string Version = "1.1.0";
 
         public override void Load()
         {

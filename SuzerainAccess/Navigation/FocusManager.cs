@@ -82,8 +82,12 @@ namespace SuzerainAccess.Navigation
             if (_screen.Top != null) SwitchTo(_screen.Top, announce: ModConfig.AutoReadScreens.Value, userInitiated: false);
         }
 
+        /// <summary>Panel the focus came from, so closing a panel can return to it.</summary>
+        private string _previousRegionId;
+
         private void SwitchTo(Region region, bool announce, bool userInitiated)
         {
+            if (_region != null && !_region.IsFallback && _region.Id != region.Id) _previousRegionId = _region.Id;
             _region = region;
             _cache.Clear();
             _elementSignature = "";
@@ -125,14 +129,54 @@ namespace SuzerainAccess.Navigation
                 Rebuild(initial: false);
                 // The element list is rebuilt, so compare by identity: e is the same logical control even
                 // when its wrapper object was replaced (this made changed values go unspoken).
+                // Choosing a category or a newspaper: go straight to its first entry, so the content of the
+                // chosen tab follows the choice instead of being at the other end of the list.
+                if (e.Role == ElementRole.Tab)
+                {
+                    // A top-level category (Economy, Law...) usually has a second row of tabs inside it
+                    // (Policies / Situations), each with its own entries. Go to that row first, so the
+                    // choice between them is not skipped; a second-level tab goes to the entries.
+                    int target = -1, count = 0;
+                    string what = null;
+                    if (!e.IsSubTab)
+                    {
+                        var subTabs = _elements.FindAll(x => x.Role == ElementRole.Tab && x.IsSubTab);
+                        if (subTabs.Count > 0)
+                        {
+                            target = _elements.FindIndex(x => x.Role == ElementRole.Tab && x.IsSubTab);
+                            count = subTabs.Count;
+                            what = count == 1 ? " tab" : " tabs";
+                        }
+                    }
+                    if (target < 0)
+                    {
+                        target = _elements.FindIndex(IsTabContent);
+                        count = _elements.FindAll(IsTabContent).Count;
+                        what = count == 1 ? " item" : " items";
+                    }
+                    if (target >= 0)
+                    {
+                        _index = target;
+                        SyncSelection(Current);
+                        _speech.Say(TextUtil.Sentence(Safe(e.Label) + ", " + count + what) + " " + Describe(Current));
+                        return;
+                    }
+                }
+
                 bool stillThere = e.IsAlive && _elements.Exists(x => x.Identity == e.Identity);
                 if (stillThere && HasToggleLikeState(e))
                 {
-                    string spoken = TextUtil.Join(Safe(e.Value), Safe(e.State));
+                    // Include the name, so a toggle never answers with a bare "selected".
+                    string spoken = TextUtil.Join(Safe(e.Label), Safe(e.Value), Safe(e.State));
                     _speech.Say(string.IsNullOrEmpty(spoken) ? "done" : spoken);
                 }
             }
         }
+
+        /// <summary>Items that belong to a tab's content (what choosing a tab should take you to).</summary>
+        private static bool IsTabContent(AccessibleElement e) =>
+            e.Role == ElementRole.Article || e.Role == ElementRole.Report || e.Role == ElementRole.RadioButton ||
+            e.Role == ElementRole.ExpandableGroup || e.Role == ElementRole.DecisionOption || e.Role == ElementRole.Character;
 
         private static bool HasToggleLikeState(AccessibleElement e) =>
             e.Role == ElementRole.CheckBox || e.Role == ElementRole.RadioButton || e.Role == ElementRole.Tab ||
@@ -167,6 +211,21 @@ namespace SuzerainAccess.Navigation
             catch (Exception ex)
             {
                 ModLog.Exception("focus-rebuild", ex);
+            }
+
+            // Newspaper: the paper you choose comes before its articles, so switching paper and reading it
+            // follow one another instead of being at opposite ends of the list.
+            if (_region.Id == "NewsPanel")
+            {
+                var tabs = list.FindAll(x => x.Role == ElementRole.Tab);
+                if (tabs.Count > 0)
+                {
+                    var articles = list.FindAll(x => x.Role == ElementRole.Article);
+                    var rest = list.FindAll(x => x.Role != ElementRole.Tab && x.Role != ElementRole.Article);
+                    list = new List<AccessibleElement>(tabs);
+                    list.AddRange(articles);
+                    list.AddRange(rest);
+                }
             }
 
             // In dialogue, put the responses first so Tab reaches the choices before the participants' portraits.
@@ -249,6 +308,23 @@ namespace SuzerainAccess.Navigation
                 foreach (var r in _screen.Regions)
                     if (r.Root != null && r.Root.Pointer != region.Root.Pointer) otherRoots.Add(r.Root.Pointer);
 
+            // Roots that never belong to the fallback region: the store/profile overlay of the mobile port
+            // exists (with controls) while the game is still loading, which made it be read at startup.
+            var excluded = new HashSet<IntPtr>();
+            if (region.Root == null)
+            {
+                try
+                {
+                    var panels = ScreenTracker.GetPanels();
+                    if (panels != null)
+                    {
+                        if (UiUtil.Alive(panels.OverlayPanel)) excluded.Add(panels.OverlayPanel.transform.Pointer);
+                        if (UiUtil.Alive(panels.ProfileHUDPanel)) excluded.Add(panels.ProfileHUDPanel.transform.Pointer);
+                    }
+                }
+                catch { }
+            }
+
             for (int i = 0; i < all.Length; i++)
             {
                 var s = all[i];
@@ -256,20 +332,33 @@ namespace SuzerainAccess.Navigation
                 if (s.TryCast<Scrollbar>() != null) continue;
                 var go = s.gameObject;
                 if (!UiUtil.IsGameObjectVisible(go)) continue;
+                // Controls on a tab's hidden page are skipped entirely: they are not part of this screen.
+                if (UiUtil.IsOnInactivePage(s.transform)) continue;
                 bool interactable = s.IsInteractable();
-                if (!interactable && !ModConfig.IncludeDisabledControls.Value) continue;
-                if (region.Root != null && BelongsToOtherRegion(s.transform, region.Root, otherRoots)) continue;
+                if (region.Root == null)
+                {
+                    // No registered panel is open (loading, or an unknown screen): only offer controls that
+                    // can actually be used, so leftovers of hidden panels are never announced.
+                    if (!interactable) continue;
+                    if (excluded.Count > 0 && BelongsToOtherRegion(s.transform, null, excluded)) continue;
+                }
+                else
+                {
+                    if (!interactable && !ModConfig.IncludeDisabledControls.Value) continue;
+                    if (BelongsToOtherRegion(s.transform, region.Root, otherRoots)) continue;
+                }
                 yield return s;
             }
         }
 
+        /// <summary>True if an ancestor of t is one of otherRoots, stopping at root (root may be null).</summary>
         private static bool BelongsToOtherRegion(Transform t, Transform root, HashSet<IntPtr> otherRoots)
         {
             if (otherRoots.Count == 0) return false;
             for (var cur = t; cur != null; cur = cur.parent)
             {
                 IntPtr p = cur.Pointer;
-                if (p == root.Pointer) return false;
+                if (root != null && p == root.Pointer) return false;
                 if (otherRoots.Contains(p)) return true;
             }
             return false;
@@ -469,6 +558,7 @@ namespace SuzerainAccess.Navigation
             _sliderElement = null;
             _pendingAfterActivation = null;
             _delayedValueElement = null;
+            _pendingRegionId = null;
         }
 
         /// <summary>ModClock.Now of the last focus move made with a navigation key.</summary>
@@ -582,7 +672,8 @@ namespace SuzerainAccess.Navigation
             {
                 // Enter is also the game's own UI Submit key. The game's EventSystem will deliver Submit to
                 // this exact object in this frame, so activating it here as well would press it twice.
-                ModLog.Debug("Enter left to the game's Submit for " + UiUtil.PathOf(e.GameObject.transform));
+                ModLog.Info("Enter left to the game's own Submit for " + UiUtil.PathOf(e.GameObject.transform) +
+                            ". If nothing happens, set 'Enter key activation' to 'always handled by the mod' in F9.");
                 AfterActivation(e);
                 return;
             }
@@ -595,8 +686,21 @@ namespace SuzerainAccess.Navigation
 
             try
             {
+                ElementFactory.LastCodexMessage = null;
                 e.Activate();
                 ModLog.Debug("Activated " + UiUtil.PathOf(e.GameObject.transform));
+                if (ElementFactory.LastCodexMessage != null)
+                {
+                    _speech.Say(ElementFactory.LastCodexMessage, important: true);
+                    ElementFactory.LastCodexMessage = null;
+                }
+                if (ElementFactory.RequestedRegionId != null)
+                {
+                    // The panel needs a moment to appear before the focus can move into it.
+                    _pendingRegionId = ElementFactory.RequestedRegionId;
+                    _pendingRegionFrames = 6;
+                    ElementFactory.RequestedRegionId = null;
+                }
             }
             catch (Exception ex)
             {
@@ -700,8 +804,31 @@ namespace SuzerainAccess.Navigation
         private AccessibleElement _delayedValueElement;
         private int _delayedValueFrames;
 
+        private string _pendingRegionId;
+        private int _pendingRegionFrames;
+
+        /// <summary>Moves the focus into a panel that an activation opened (for example the Codex).</summary>
+        private void ProcessPendingRegion()
+        {
+            if (_pendingRegionId == null) return;
+            _screen.ForcePoll();
+            foreach (var r in _screen.Regions)
+            {
+                if (r.Id != _pendingRegionId) continue;
+                _pendingRegionId = null;
+                SwitchTo(r, announce: true, userInitiated: true);
+                return;
+            }
+            if (--_pendingRegionFrames <= 0)
+            {
+                ModLog.Info("Panel " + _pendingRegionId + " did not appear, so the focus did not move.");
+                _pendingRegionId = null;
+            }
+        }
+
         public void LateTick()
         {
+            ProcessPendingRegion();
             if (_delayedValueElement != null && --_delayedValueFrames <= 0)
             {
                 var e = _delayedValueElement;
@@ -736,8 +863,12 @@ namespace SuzerainAccess.Navigation
 
         public void RepeatFocused() => _speech.Say(Current != null ? Describe(Current) : EmptyMessage());
 
-        private string EmptyMessage() =>
-            _region == null ? "No screen detected yet." : _region.Name + ": no controls. Press F2 to read the text.";
+        private string EmptyMessage()
+        {
+            if (_region == null) return "The game is still loading.";
+            if (_region.IsFallback) return "The game is still loading, or this screen has no controls yet.";
+            return _region.Name + ": no controls. Press F2 to read the text.";
+        }
 
         /// <summary>All visible text of the current region in reading order.</summary>
         public List<string> RegionTexts()
@@ -856,8 +987,15 @@ namespace SuzerainAccess.Navigation
                 if (UiUtil.Alive(focus))
                 {
                     // Same code path the game uses for the gamepad "cancel/close" action on focusable panels.
+                    string cameFrom = _previousRegionId;
                     focus.OnCloseButtonClick();
                     _screen.ForcePoll();
+                    // Return to the panel this one was opened from (for example the Codex back to Connections).
+                    if (cameFrom != null && cameFrom != _region.Id)
+                    {
+                        _pendingRegionId = cameFrom;
+                        _pendingRegionFrames = 8;
+                    }
                     return;
                 }
 
@@ -874,7 +1012,9 @@ namespace SuzerainAccess.Navigation
                         return;
                     }
                 }
-                _speech.Say("No back action for " + _region.Name + ".");
+                _speech.Say(_region.Tier == PanelTier.Base
+                    ? _region.Name + " is part of the screen and cannot be closed. Control Tab moves to another panel."
+                    : "No back action for " + _region.Name + ".");
             }
             catch (Exception ex)
             {

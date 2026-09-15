@@ -61,6 +61,7 @@ namespace SuzerainAccess.UI
                 if (cont != null && cont.Pointer == s.Pointer)
                 {
                     e.Role = ElementRole.Button;
+                    e.IsConversationContinue = true;
                     e.Label = () => "Continue";
                     e.Hint = "Enter or Space continues the dialogue.";
                     return true;
@@ -82,6 +83,26 @@ namespace SuzerainAccess.UI
                         return string.IsNullOrEmpty(tip) ? "Switch map" : tip;
                     };
                     e.Hint = "Switches between the main map and the world map. Control F6 does the same from anywhere.";
+                    return true;
+                }
+            }
+            catch { }
+
+            // Location information arrows (verified TokenInformationPanel.cycleButtonsContainer): they move to
+            // the previous or next location's information, the same as the game's Left and Right keys.
+            try
+            {
+                var info = Panels.Instance != null ? Panels.Instance.TokenInformationPanel : null;
+                var infoCycle = info != null ? info.cycleButtonsContainer : null;
+                if (infoCycle != null && s.transform.IsChildOf(infoCycle))
+                {
+                    bool leftMost = true;
+                    var buttons = infoCycle.GetComponentsInChildren<Button>(false);
+                    for (int i = 0; i < buttons.Length; i++)
+                        if (buttons[i].Pointer != s.Pointer && buttons[i].transform.position.x < s.transform.position.x) leftMost = false;
+                    e.Role = ElementRole.Button;
+                    e.Label = () => leftMost ? "Previous location" : "Next location";
+                    e.Hint = "Shows another location's information. The Left and Right arrow keys do the same.";
                     return true;
                 }
             }
@@ -188,7 +209,7 @@ namespace SuzerainAccess.UI
                     e.Role = ElementRole.Button;
                     e.IsConversationMinimize = true;
                     e.Label = () => "Minimize conversation";
-                    e.Hint = "Hides the conversation so you can use the map and menus. A Return to conversation button then brings it back. Use Numpad Enter to press it.";
+                    e.Hint = "Hides the conversation so you can use the map and menus. A Return to conversation button then brings it back. Use Control Enter to press it.";
                     return true;
                 }
             }
@@ -280,6 +301,39 @@ namespace SuzerainAccess.UI
                     return true;
                 }
 
+                // Newspaper tabs are logos, so their only text is the unread counter. The newspaper's name
+                // comes from its database name (verified TemplateNewsCategoryToggle.GetNewsCategoryData()).
+                var newsTab = t.GetComponent<TemplateNewsCategoryToggle>();
+                if (newsTab != null && level <= 1)
+                {
+                    var toggle = newsTab.toggle;
+                    e.Role = ElementRole.Tab;
+                    e.Label = () =>
+                    {
+                        string name = "";
+                        try
+                        {
+                            var data = newsTab.GetNewsCategoryData();
+                            if (data != null) name = TextUtil.CamelToWords(data.NameInDatabase ?? "");
+                        }
+                        catch { }
+                        if (string.IsNullOrWhiteSpace(name)) name = "Newspaper " + (newsTab.currentIndex + 1);
+                        return name;
+                    };
+                    e.Value = () =>
+                    {
+                        try
+                        {
+                            int unread = newsTab.GetUnreadNewsCount();
+                            return unread <= 0 ? "no unread articles" : unread + (unread == 1 ? " unread article" : " unread articles");
+                        }
+                        catch { return ""; }
+                    };
+                    e.State = () => ToggleState(toggle, e);
+                    e.Identity = newsTab.gameObject.Pointer;
+                    return true;
+                }
+
                 var article = t.GetComponent<TemplateNewsArticle>();
                 if (article != null)
                 {
@@ -312,6 +366,17 @@ namespace SuzerainAccess.UI
                 if (interaction != null)
                 {
                     e.Role = ElementRole.MapAction;
+                    // Pressing the button alone did not start the event: the game runs its own OnClick(),
+                    // which is what a mouse click reaches (verified TemplateInteractionButton.OnClick).
+                    e.Activate = () =>
+                    {
+                        try { interaction.OnClick(); }
+                        catch (Exception ex)
+                        {
+                            ModLog.Exception("interaction-click", ex);
+                            ActivateDefault(s);
+                        }
+                    };
                     e.Label = () => TextUtil.Join(UiUtil.TextOf(interaction.titleText), UiUtil.TextOf(interaction.subtitleText));
                     e.State = () =>
                     {
@@ -334,9 +399,16 @@ namespace SuzerainAccess.UI
                 var effect = t.GetComponent<TemplateTokenEffect>();
                 if (effect != null)
                 {
+                    // Sighted players see the progress as a filling bar; the real number is in the game data
+                    // (verified TokenStatusEffectData.ProgressPercentage and its Title/Subtitle).
                     e.Role = ElementRole.StatusEffect;
-                    e.Label = () => UiUtil.TextOf(effect.tooltipTitle);
-                    e.Detail = () => UiUtil.TextOf(effect.tooltipSubtitle);
+                    e.Label = () => GameText.EffectTitle(effect);
+                    e.Value = () =>
+                    {
+                        int percent = GameText.EffectPercent(effect);
+                        return percent < 0 ? "" : percent + " percent complete";
+                    };
+                    e.Detail = () => GameText.EffectSubtitle(effect);
                     return true;
                 }
 
@@ -356,7 +428,10 @@ namespace SuzerainAccess.UI
                     e.Label = () => UiUtil.TextOf(conversant.tooltipTitle);
                     // The portrait tooltip's second line (the character's title/role) is read as its value.
                     e.Value = () => UiUtil.TextOf(conversant.tooltipSubitle);
-                    e.Hint = "A person taking part in this conversation. Enter does what clicking the portrait does; any panel that opens is announced.";
+                    // Open this person's Codex entry (verified: TemplateConversant.GetCharacterData(),
+                    // CharacterProperties.NoCodexEntry, CodexPanel.Show/GoToCodexEntryByNameInDatabase).
+                    e.Activate = () => OpenCodexForCharacter(conversant);
+                    e.Hint = "A person in this conversation. Enter opens their Codex entry; Space continues the dialogue.";
                     return true;
                 }
 
@@ -553,7 +628,11 @@ namespace SuzerainAccess.UI
             var toggleCtl = s.TryCast<Toggle>();
             if (toggleCtl != null)
             {
-                if (IsTabToggle(s.transform)) e.Role = ElementRole.Tab;
+                if (IsTabToggle(s.transform))
+                {
+                    e.Role = ElementRole.Tab;
+                    e.IsSubTab = IsSubTabToggle(s.transform);
+                }
                 else if (toggleCtl.group != null) e.Role = ElementRole.RadioButton;
                 else e.Role = ElementRole.CheckBox;
                 e.State = () => ToggleState(toggleCtl, e);
@@ -593,6 +672,14 @@ namespace SuzerainAccess.UI
                     return SiblingLabel(s.transform, s);
                 };
             }
+        }
+
+        /// <summary>Second-level tabs: Policies / Situations inside an Overview or Connections category.</summary>
+        private static bool IsSubTabToggle(Transform t)
+        {
+            for (int i = 0; i <= 1 && t != null; i++, t = t.parent)
+                if (t.GetComponent<RightPanelSubCategoryToggle>() != null) return true;
+            return false;
         }
 
         /// <summary>Toggle types that Suzerain uses as tabs / category switches (verified class names).</summary>
@@ -803,6 +890,71 @@ namespace SuzerainAccess.UI
                 return s;
             }
             return null;
+        }
+
+        /// <summary>True if the Codex entry page is showing an article for this person.</summary>
+        private static bool CodexShows(CodexPanel codex, string person)
+        {
+            try
+            {
+                var page = codex.codexEntryPage;
+                if (!UiUtil.Alive(page)) return false;
+                var entry = page.GetCodexEntryData();
+                if (entry != null && !string.IsNullOrEmpty(entry.NameInDatabase)) return true;
+                string shown = UiUtil.TextOf(page.title);
+                return !string.IsNullOrEmpty(shown) && shown.IndexOf(person, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>Message spoken by the last Codex attempt, so the focus manager can announce it.</summary>
+        public static string LastCodexMessage;
+
+        /// <summary>Panel the focus should move to after the last activation (e.g. the Codex), or null.</summary>
+        public static string RequestedRegionId;
+
+        /// <summary>Opens the Codex at a conversation participant's own entry.</summary>
+        private static void OpenCodexForCharacter(TemplateConversant conversant)
+        {
+            LastCodexMessage = null;
+            try
+            {
+                var data = conversant.GetCharacterData();
+                var codex = Panels.Instance != null ? Panels.Instance.CodexPanel : null;
+                if (data == null || !UiUtil.Alive(codex))
+                {
+                    LastCodexMessage = "No Codex entry for this person.";
+                    ModLog.Info("No Codex entry available for this character.");
+                    return;
+                }
+                var props = data.CharacterProperties;
+                if (props != null && props.NoCodexEntry)
+                {
+                    LastCodexMessage = TextUtil.Clean(data.CharacterName) + " has no Codex entry.";
+                    ModLog.Info("This character has no Codex entry.");
+                    return;
+                }
+                if (!codex.IsShowing()) codex.Show();
+                // A character's database name is not always the Codex entry's; the game also offers lookup
+                // by the entry title, which for people is their name. Both are tried, and the result is
+                // checked against CodexEntryPage.title.
+                string person = TextUtil.Clean(data.CharacterName);
+                codex.GoToCodexEntryByNameInDatabase(data.NameInDatabase);
+                if (!CodexShows(codex, person))
+                {
+                    codex.GoToCodexEntryByTitle(person);
+                    ModLog.Info("Codex lookup by database name failed for '" + data.NameInDatabase + "'; tried the title '" + person + "'.");
+                }
+                // The conversation stays open underneath, so the focus must be moved into the Codex.
+                RequestedRegionId = "CodexPanel";
+                LastCodexMessage = "Codex: " + person + ". F7 reads the article, Backspace returns to the conversation.";
+                ModLog.Info("Opened Codex entry for " + person + ".");
+            }
+            catch (Exception ex)
+            {
+                ModLog.Exception("codex-for-character", ex);
+                LastCodexMessage = "Could not open the Codex entry.";
+            }
         }
 
         // ------------------------------------------------------------------ activation

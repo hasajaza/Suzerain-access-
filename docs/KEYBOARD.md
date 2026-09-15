@@ -3,7 +3,7 @@
 All mod keys can be changed:
 
 - in game, with **F9 > "Key: ..."**: press Enter on the item, then press the new key or combination. Backspace cancels. Left or Right resets the key to its default.
-- in `BepInEx\config\com.suzerainaccess.mod.cfg`, section `[Keys]`. The format is an optional `Ctrl+`, `Shift+` or `Alt+`, followed by a Unity Input System key name, for example `Ctrl+F2`, `PageDown`, `Numpad5` or `Backquote`.
+- in `BepInEx\config\com.suzerainaccess.mod.cfg`, section `[Keys]`. The format is an optional `Ctrl+`, `Shift+` or `Alt+`, followed by a Unity Input System key name, for example `Ctrl+F2`, `PageDown`, `Home` or `Backquote`. All default keys work on laptop keyboards without a numeric keypad.
 
 Keys refer to **physical key positions**, as in the Unity Input System. The defaults use only keys that are the same on every layout (Tab, Home, End, Page keys, F-keys, arrows, Enter, Backspace), so AZERTY and QWERTY behave identically.
 
@@ -23,7 +23,7 @@ The game's own control map was read from the game files. Its keyboard bindings a
 
 The mod does not use any of these, with three deliberate exceptions:
 
-- **Enter.** When the game's own selection is already on the focused control, the mod lets the game's Submit press it. Otherwise the mod presses it itself. Either way the control is pressed exactly once. If Enter ever does nothing, use **Numpad Enter**, which is always handled by the mod, or set "Enter key activation" to "always handled by the mod" in F9.
+- **Enter.** When the game's own selection is already on the focused control, the mod lets the game's Submit press it. Otherwise the mod presses it itself. Either way the control is pressed exactly once. If Enter ever does nothing, use **Ctrl+Enter**, which is always handled by the mod, or set "Enter key activation" to "always handled by the mod" in F9.
 - **Up and Down.** The game only uses them to move between dialogue responses. When you press one, the mod first lets the game react. If the game moves its selection (for example between responses), the mod announces the new item. If the game does nothing (for example in menus), the mod moves the focus itself. Either way you move exactly one step.
 - **Left and Right.** On a slider the game may also react to these; the mod lets the game go first and only steps the slider itself if the game did not, so each press is one step. The mod only uses these when the focused control is a slider, selector or combo box. Otherwise they reach the game, for example to switch reports.
 
@@ -35,14 +35,15 @@ The mod does not use any of these, with three deliberate exceptions:
 | Up arrow or Shift+Tab | Previous control | Says "Bottom" when it wraps. |
 | Home / End | First / last control | |
 | Enter | Activate | Buttons, check boxes, tabs, responses, decision options, reports, map actions. On a text field, starts editing. |
-| Numpad Enter | Activate (always by the mod) | |
+| Ctrl+Enter | Activate (always by the mod). Use this on keyboards without a numeric keypad, or where Enter belongs to the game. |
 | Right / Left | Change value | Sliders, selectors (paged decisions) and combo boxes. |
 | Backspace | Back / close | Options page: the first Backspace applies your changes (the game's Apply), the second leaves. Pause menu: back to the menu, or resume. Main menu: back from a sub-page. Other panels: the game's own close action. Conversations cannot be closed. |
 | Ctrl+1 | Main content | The conversation, decision, report, newspaper, pop-up question or menu in the middle of the screen. |
 | Ctrl+2 | Side panel | Journal, codex, overview, connections, location panel, character or country details. |
 | Ctrl+3 | Navigation bar | The buttons that open the journal, codex, overview... |
 | Ctrl+4 | Statistics bar | |
-| Ctrl+5 | Continue button panel | Ending the turn, or returning to a minimized conversation. If a kind of panel is not open, the mod says so and focus stays where it is. |
+| Ctrl+5 | Continue button panel | Ending the turn, or returning to a minimized conversation. |
+| Ctrl+6 | Other bars | Progress (ongoing projects), your own details, turn cost. If a kind of panel is not open, the mod says so and focus stays where it is. |
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous panel | Several panels are often open at once, for example the statistics bar, navigation bar, side panel and continue button. |
 | Page Down / Page Up | Next / previous line of text | Reads the current panel's text one line at a time. If you moved to a control with Tab or the arrows, reading starts at that control's text, not at the top of the panel. In the map browser these keys change the filter instead. |
 | Ctrl+Page Down / Ctrl+Page Up | Next / previous heading | Jumps between titles in the panel text. A heading is text shown larger than the panel's normal text, or short bold text. |
@@ -97,7 +98,8 @@ When the current step is complete, the **Continue** button appears, and the mod 
 - **Enter or Space** continue the dialogue. The mod first lets the game react; if the game does not continue, the mod continues through the game's own continue function.
 - When responses are offered, **Up and Down arrows** (or Tab) choose one, and **Enter** selects it.
 - If you move to a participant's portrait or to the **Minimize conversation** button yourself, Enter presses it. As soon as a new line appears, Enter goes back to continuing the dialogue.
-- **Numpad Enter** always presses the focused control.
+- On a participant's **portrait**, **Enter** opens that person's Codex entry, where F7 reads the whole article and Backspace returns to the conversation. Space still continues the dialogue.
+- **Ctrl+Enter** always presses the focused control.
 - **Page Up** reads the newest dialogue line; each further Page Up goes one line back through the conversation, and Page Down goes forward again. F3 repeats the newest line.
 - Minimizing hides the conversation so you can use the map and menus. The **Return to conversation** button (Ctrl+Tab to the continue button panel) brings it back.
 

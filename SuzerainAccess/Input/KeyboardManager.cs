@@ -17,7 +17,7 @@ namespace SuzerainAccess.Input
         ReadStatistics, ReadStatus, ReadLatestNotification, ReadNotificationHistory, OpenLatestNotification,
         ToggleMap, SwitchMap, WhatNext, ReadDocument,
         Stat1, Stat2, Stat3, Stat4, Stat5, Stat6, Stat7, Stat8, Stat9, TurnInfo,
-        PanelMain, PanelSide, PanelNavigation, PanelStatistics, PanelContinue, RepeatLastSpeech, DescribeFocused, SettingsMenu, StopSpeech, ReconnectSpeech, NextSpeechEngine, ToggleMod
+        PanelMain, PanelSide, PanelNavigation, PanelStatistics, PanelContinue, PanelExtra, RepeatLastSpeech, DescribeFocused, SettingsMenu, StopSpeech, ReconnectSpeech, NextSpeechEngine, ToggleMod
     }
 
     internal readonly struct KeyChord : IEquatable<KeyChord>
@@ -97,7 +97,7 @@ namespace SuzerainAccess.Input
             { Command.FirstElement, ("Home", "Move to the first control") },
             { Command.LastElement, ("End", "Move to the last control") },
             { Command.Activate, ("Enter", "Activate the focused control") },
-            { Command.ActivateAlternate, ("NumpadEnter", "Activate the focused control (always handled by the mod)") },
+            { Command.ActivateAlternate, ("Ctrl+Enter", "Activate the focused control (always handled by the mod; works on keyboards without a numeric keypad)") },
             { Command.ContinueDialogue, ("Space", "Continue the dialogue (only in conversations; if the game does not continue by itself, the mod does)") },
             { Command.IncreaseValue, ("RightArrow", "Increase or change the value of a slider, selector or combo box") },
             { Command.DecreaseValue, ("LeftArrow", "Decrease or change the value of a slider, selector or combo box") },
@@ -131,6 +131,7 @@ namespace SuzerainAccess.Input
             { Command.PanelNavigation, ("Ctrl+Digit3", "Go to the navigation bar") },
             { Command.PanelStatistics, ("Ctrl+Digit4", "Go to the statistics bar") },
             { Command.PanelContinue, ("Ctrl+Digit5", "Go to the Continue button panel") },
+            { Command.PanelExtra, ("Ctrl+Digit6", "Go to the other bars: progress, your own details, turn cost") },
             { Command.ReadStatus, ("Shift+F4", "Read turn, map and game state") },
             { Command.ReadLatestNotification, ("F5", "Read the latest notification") },
             { Command.ReadNotificationHistory, ("Shift+F5", "Read recent notifications") },

@@ -53,6 +53,25 @@ namespace SuzerainAccess.UI
             return true;
         }
 
+        /// <summary>
+        /// True if a CanvasGroup above the control switches interaction off. Suzerain keeps the pages of a
+        /// tabbed panel (Connections, Overview...) alive and fully drawn but non-interactive, so this marks
+        /// controls that belong to a page other than the one on show.
+        /// </summary>
+        public static bool IsOnInactivePage(Transform t)
+        {
+            if (!Alive(t)) return false;
+            var groups = t.GetComponentsInParent<CanvasGroup>(false);
+            for (int i = 0; i < groups.Length; i++)
+            {
+                var g = groups[i];
+                if (!g.enabled) continue;
+                if (!g.interactable) return true;
+                if (g.ignoreParentGroups) break;
+            }
+            return false;
+        }
+
         public static bool IsGameObjectVisible(GameObject go)
         {
             if (!Alive(go)) return false;
@@ -112,7 +131,7 @@ namespace SuzerainAccess.UI
                 var t = texts[i];
                 try
                 {
-                    if (!includeHidden && !IsTextVisible(t)) continue;
+                    if (!includeHidden && (!IsTextVisible(t) || IsOnInactivePage(t.transform))) continue;
                     if (skip != null && skip(t)) continue;
                     string s = TextOf(t);
                     if (ModConfig.IgnoreDecorativeText.Value && TextUtil.IsDecorative(s)) continue;

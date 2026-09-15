@@ -133,6 +133,32 @@ namespace SuzerainAccess.Features
                     key = text;
                     return true;
                 }
+                case "TokenProgressPanel":
+                {
+                    string progress = ProgressText(panels.TokenProgressPanel);
+                    if (string.IsNullOrEmpty(progress)) return false;
+                    text = progress;
+                    key = progress;
+                    return true;
+                }
+                case "OverviewPanel":
+                {
+                    // The policy or situation currently selected (verified OverviewPanel.entryTitle/entryDescription).
+                    var p = panels.OverviewPanel;
+                    string entry = TextUtil.Join(UiUtil.VisibleTextOf(p.entryTitle), UiUtil.VisibleTextOf(p.entryDescription));
+                    if (string.IsNullOrWhiteSpace(entry)) return false;
+                    text = TextUtil.Sentence(UiUtil.VisibleTextOf(p.entryTitle)) + " " + UiUtil.VisibleTextOf(p.entryDescription);
+                    key = entry;
+                    return true;
+                }
+                case "CodexPanel":
+                {
+                    string article = CodexArticle(panels.CodexPanel);
+                    if (string.IsNullOrEmpty(article)) return false;
+                    text = article;
+                    key = article;
+                    return true;
+                }
                 case "GraphPanel":
                 {
                     var p = panels.GraphPanel;
@@ -309,6 +335,59 @@ namespace SuzerainAccess.Features
             return TextUtil.JoinWith(" ", parts);
         }
 
+        /// <summary>The open Codex article: its title and text (verified CodexEntryPage.title/description).</summary>
+        private static string CodexArticle(CodexPanel codex)
+        {
+            try
+            {
+                var page = codex.codexEntryPage;
+                if (!UiUtil.Alive(page) || !UiUtil.IsGameObjectVisible(page.gameObject)) return null;
+                string title = UiUtil.TextOf(page.title);
+                string description = UiUtil.TextOf(page.description);
+                if (string.IsNullOrWhiteSpace(description)) return null;
+                return TextUtil.Sentence(title) + " " + description;
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Ongoing projects on the map with their progress (verified: TokenProgressPanel.instantiatedTokenProgress,
+        /// TemplateTokenProgress.currentToken / instantiatedTokenEffects, TokenStatusEffectData.ProgressPercentage).
+        /// </summary>
+        private static string ProgressText(TokenProgressPanel panel)
+        {
+            try
+            {
+                if (!UiUtil.Alive(panel)) return null;
+                var parts = new List<string>();
+                // Walk the panel for the effect widgets: the game's own lists are not always filled in.
+                var effects = panel.transform.GetComponentsInChildren<TemplateTokenEffect>(false);
+                for (int i = 0; i < effects.Length; i++)
+                {
+                    var effect = effects[i];
+                    if (!UiUtil.Alive(effect) || !effect.gameObject.activeInHierarchy) continue;
+                    string where = "";
+                    try
+                    {
+                        var item = effect.GetComponentInParent<TemplateTokenProgress>();
+                        if (item != null && item.currentToken != null) where = TextUtil.Clean(item.currentToken.GetTokenData()?.Title);
+                    }
+                    catch { }
+                    int percent = GameText.EffectPercent(effect);
+                    string entry = TextUtil.Join(GameText.EffectTitle(effect), where,
+                        percent < 0 ? "" : percent + " percent complete", GameText.EffectSubtitle(effect));
+                    if (!string.IsNullOrWhiteSpace(entry)) parts.Add(TextUtil.Sentence(entry));
+                }
+                if (parts.Count == 0) ModLog.InfoOnce("progress-empty", "Progress panel: no readable effect widgets were found under " + UiUtil.PathOf(panel.transform) + ".");
+                return parts.Count == 0 ? null : TextUtil.JoinWith(" ", parts);
+            }
+            catch (Exception ex)
+            {
+                ModLog.Exception("progress-text", ex);
+                return null;
+            }
+        }
+
         // ------------------------------------------------------------------ F7
 
         public void ReadDocument()
@@ -319,6 +398,14 @@ namespace SuzerainAccess.Features
 
             try
             {
+                // An open Codex entry is what the player just asked to read, even when the focus is still
+                // in the conversation underneath it.
+                if (_screen.IsShowing("CodexPanel"))
+                {
+                    string article = CodexArticle(panels.CodexPanel);
+                    if (!string.IsNullOrEmpty(article)) { _speech.Say(article); return; }
+                }
+
                 switch (region.Id)
                 {
                     case "ReportPanel": _speech.Say(ReportText(panels.ReportPanel, withHint: false)); return;
@@ -326,6 +413,15 @@ namespace SuzerainAccess.Features
                     case "PagedDecisionPanel": _speech.Say(PagedDecisionText(panels.PagedDecisionPanel)); return;
                     case "TokenInformationPanel": _speech.Say(TokenInformationText(panels.TokenInformationPanel)); return;
                     case "GraphPanel": _speech.Say(GraphText(panels.GraphPanel)); return;
+                    case "TokenProgressPanel":
+                    {
+                        string progress = ProgressText(panels.TokenProgressPanel);
+                        _speech.Say(string.IsNullOrEmpty(progress) ? "No projects in progress." : progress);
+                        return;
+                    }
+                    case "CodexPanel":
+                        _speech.Say("The Codex is showing its topic list. Choose an entry, or use the search field.");
+                        return;
                     case "CharacterCustomizationPanel":
                     {
                         // Every customization row with its current value, plus the character's details.

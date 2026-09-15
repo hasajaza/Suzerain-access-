@@ -133,7 +133,7 @@ Everything below was verified in the supplied interop assemblies.
 
 These points could not be decided from static inspection alone, or are not implemented yet:
 
-1. **Enter in "Auto" mode relies on the game's EventSystem delivering Submit to the selected object.** The startup log records the input module type and `sendNavigationEvents`. If Enter does nothing, switch the setting to "always handled by the mod", or use Numpad Enter.
+1. **Enter in "Auto" mode relies on the game's EventSystem delivering Submit to the selected object.** The startup log records the input module type and `sendNavigationEvents`. If Enter does nothing, switch the setting to "always handled by the mod", or use Ctrl+Enter.
 2. **Statistic names are taken from the first line of the statistic's tooltip text** (`statTooltipText`). The fallback is `HUDStatProperties.Title`, then the database name. If a name sounds wrong, report it with the log.
 3. **"New" on reports means the game's notification marker** (`IsNotificationActive`), which is what sighted players see as the new-item indicator. `ReportData.IsDone` exists but its meaning could not be confirmed, so it is not announced.
 4. **Dialogue lines are read once the visible text contains the end of the line's `unformattedText`,** so the typewriter animation has finished. If the visible text never matches, the speaker name plus the unformatted text is spoken after 2.5 seconds.

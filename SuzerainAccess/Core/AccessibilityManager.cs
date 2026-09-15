@@ -302,11 +302,15 @@ namespace SuzerainAccess.Core
             else if (_keys.Triggered(Command.PanelSide))
                 _focus.JumpToRegion(r => r.Tier == PanelTier.Side, "No side panel is open.");
             else if (_keys.Triggered(Command.PanelNavigation))
-                _focus.JumpToRegion(r => r.Id == "NavigationPanel", "The navigation bar is not available here.");
+                _focus.JumpToRegion(r => r.Id == "NavigationPanel" || r.Id == "WarPlayerActionsPanel", "The navigation bar is not available here.");
             else if (_keys.Triggered(Command.PanelStatistics))
-                _focus.JumpToRegion(r => r.Id == "HUDPanel", "The statistics bar is not available here.");
+                _focus.JumpToRegion(r => r.Id == "HUDPanel" || r.Id == "WarHUDPanel", "The statistics bar is not available here.");
             else if (_keys.Triggered(Command.PanelContinue))
-                _focus.JumpToRegion(r => r.Id == "ContinueButtonPanel", "The Continue button is not available right now.");
+                _focus.JumpToRegion(r => r.Id == "ContinueButtonPanel" || r.Id == "ContinueCenterPanel" || r.Id == "WarTurnPanel",
+                    "The Continue button is not available right now.");
+            else if (_keys.Triggered(Command.PanelExtra))
+                _focus.JumpToRegion(r => r.Id == "TokenProgressPanel" || r.Id == "BottomLeftPanel" || r.Id == "TurnCostPanel" || r.Id == "SocialsButtonPanel",
+                    "No extra panel is open.");
             else if (_keys.Triggered(Command.NextRegion)) _focus.CycleRegion(1);
             else if (_keys.Triggered(Command.PreviousRegion)) _focus.CycleRegion(-1);
             else if (_keys.Triggered(Command.NextTextLine)) _reviewer.Move(1);
@@ -324,7 +328,7 @@ namespace SuzerainAccess.Core
         /// <summary>
         /// Enter in a conversation: a response is selected; any other control is pressed only if you moved to
         /// it yourself since the last line appeared. Otherwise Enter continues the dialogue, the way a
-        /// sighted player clicks to continue. Numpad Enter always presses the focused control.
+        /// sighted player clicks to continue. Ctrl+Enter always presses the focused control.
         /// </summary>
         private void ActivateOrContinue(bool alternate)
         {
@@ -332,13 +336,23 @@ namespace SuzerainAccess.Core
             {
                 var current = _focus.Current;
                 bool onResponse = current != null && current.Role == UI.ElementRole.Choice;
-                bool chosenByUser = current != null && _focus.LastExplicitFocusTime > _dialogue.LastDialogueEventTime;
+                // A participant's portrait: Enter opens their Codex entry. Space still continues the
+                // dialogue, and Enter continues everywhere else in the conversation.
+                bool portrait = current != null && current.Role == UI.ElementRole.Character;
+                // The Continue button goes through the dialogue continue path, which presses the button and,
+                // if the line does not advance, calls the game's own continue method.
+                bool continueButton = current != null && current.IsConversationContinue;
+                bool chosenByUser = !continueButton && (portrait || (current != null && _focus.LastExplicitFocusTime > _dialogue.LastDialogueEventTime));
+                ModLog.Debug($"Enter in conversation: item='{(current != null ? current.Role.ToString() : "none")}', " +
+                             $"response={onResponse}, continueButton={continueButton}, chosenByUser={chosenByUser}");
                 if (!onResponse && !chosenByUser)
                 {
                     _dialogue.RequestContinue();
                     return;
                 }
             }
+            ModLog.Debug("Activate key: " + (alternate ? "Ctrl+Enter" : "Enter") + " on " +
+                         (_focus.Current != null ? _focus.Current.Role + " in " + (_focus.CurrentRegion != null ? _focus.CurrentRegion.Name : "?") : "nothing"));
             _reviewer.NoteActivation();
             _focus.Activate(fromSharedEnterKey: !alternate);
         }

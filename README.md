@@ -27,19 +27,11 @@ At startup the mod hashes your files. If they differ, it writes a warning to the
 
 The mod has no NuGet packages and no Harmony patches. Every reference comes from your game folder.
 
-## Build (Visual Studio)
+## Building from source
 
-1. **Close the game.** Windows does not allow replacing the plugin while the game is running.
-2. Open `SuzerainAccess.sln` and choose **Build > Rebuild Solution**.
-3. The build copies **`SuzerainAccess.dll` straight into `<Suzerain folder>\BepInEx\plugins\`**, and `JawsBridge32.exe` next to `Suzerain.exe`. The Output window confirms it with "SuzerainAccess: plugin copied to ...". Your own speech files next to `Suzerain.exe` (`UniversalSpeech.dll`, `nvdaControllerClient.dll`, `ZDSRAPI.dll`) are never overwritten.
-4. If the build says it cannot find the game, put your game folder between `<SuzerainDir>` and `</SuzerainDir>` in `SuzerainAccess\GamePath.props`.
-5. If the build warns that it could not copy the plugin, close the game and build again. If that still fails, start Visual Studio with "Run as administrator", or copy `SuzerainAccess\bin\Release\SuzerainAccess.dll` by hand.
+The project targets `net6.0` (the runtime BepInEx 6 uses) and has no NuGet packages: every reference comes from your own game folder, `BepInEx\core` and `BepInEx\interop`. So the game must have been started once with BepInEx 6 installed.
 
-To turn the automatic copy off, set `DeployToGame` to `false` in `GamePath.props`.
-
-## Install (first time only)
-
-Put `UniversalSpeech.dll` (in `SuzerainAccess\bin\Release\` after a build) and, for NVDA, `nvdaControllerClient.dll` next to `Suzerain.exe`. Everything else is copied by the build.
+If the build cannot find the game, set your game folder in `SuzerainAccess\GamePath.props`. After a successful build, `SuzerainAccess.dll` is copied into `BepInEx\plugins` and `JawsBridge32.exe` next to `Suzerain.exe`; set `DeployToGame` to `false` in that file to switch the copying off. `scripts\make-release.ps1` builds the player packages.
 
 ## Universal Speech setup
 
@@ -58,11 +50,11 @@ The full reference is in [`docs/KEYBOARD.md`](docs/KEYBOARD.md). Every key can b
 |---|---|
 | Down / Up arrow, or Tab / Shift+Tab | Next / previous control |
 | Home / End | First / last control |
-| Enter (or Numpad Enter) | Activate |
+| Enter (or Ctrl+Enter) | Activate |
 | Left / Right | Change a slider, selector or combo box |
 | Backspace | Back / close panel |
 | Ctrl+Tab / Ctrl+Shift+Tab | Next / previous panel on screen |
-| Ctrl+1 to Ctrl+5 | Go to: main content / side panel / navigation bar / statistics bar / Continue button |
+| Ctrl+1 to Ctrl+6 | Go to: main content / side panel / navigation bar / statistics bar / Continue button / other bars |
 | Page Down / Page Up | Read the panel's text line by line, starting at the focused control |
 | Ctrl+Page Down / Ctrl+Page Up | Next / previous heading in the panel text |
 | Ctrl+Home / Ctrl+End | First / last line of the panel text |

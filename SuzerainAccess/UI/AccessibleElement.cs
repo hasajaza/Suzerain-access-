@@ -43,6 +43,12 @@ namespace SuzerainAccess.UI
         /// <summary>The conversation's minimize button (ConversationPanel.minimizeButton).</summary>
         public bool IsConversationMinimize;
 
+        /// <summary>The conversation's Continue button.</summary>
+        public bool IsConversationContinue;
+
+        /// <summary>A second-level tab (for example Policies / Situations inside an Overview category).</summary>
+        public bool IsSubTab;
+
         /// <summary>The game's "new" marker on this control (NotificationIcon), if it has one.</summary>
         public NotificationIcon Notice;
 
